@@ -7,6 +7,10 @@ const keys = {};
 window.addEventListener('keydown', e => { keys[e.key] = true; });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+// Touch control state
+let touchLeft = false;
+let touchRight = false;
+
 const car = {
   x: canvas.width / 2 - 20,
   y: canvas.height - 100,
@@ -177,53 +181,37 @@ function drawMadeBy() {
   ctx.fillText('Made by: Wassim Zatiour', 20, canvas.height - 20);
 }
 
-function gameLoop() {
-  if (gameOver) {
-    if (score > highscore) {
-      highscore = score;
-      localStorage.setItem('highscore', highscore);
+// Touch controls for mobile
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const touch of e.touches) {
+    if (touch.clientX < canvas.width / 2) {
+      touchLeft = true;
+    } else {
+      touchRight = true;
     }
-
-    ctx.fillStyle = 'white';
-    ctx.font = '48px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
-    drawScore();
-    drawHighscore();
-    drawMadeBy();
-    return;
   }
+}, { passive: false });
 
-  drawRoad();
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  touchLeft = false;
+  touchRight = false;
+}, { passive: false });
 
-  // Controls: Arrows + WASD + ZQSD (both cases)
-  if ((keys['ArrowLeft'] || keys['a'] || keys['A'] || keys['q'] || keys['Q']) && car.x > 0) {
+function update() {
+  if (keys.ArrowLeft || touchLeft) {
     car.x -= car.speed;
   }
-  if ((keys['ArrowRight'] || keys['d'] || keys['D']) && car.x + 40 < canvas.width) {
+  if (keys.ArrowRight || touchRight) {
     car.x += car.speed;
   }
-
-  // Optional vertical movement - comment out if not needed
-  /*
-  if ((keys['ArrowUp'] || keys['w'] || keys['W'] || keys['z'] || keys['Z']) && car.y > 0) {
-    car.y -= car.speed;
-  }
-  if ((keys['ArrowDown'] || keys['s'] || keys['S']) && car.y + 60 < canvas.height) {
-    car.y += car.speed;
-  }
-  */
+  if (car.x < 0) car.x = 0;
+  if (car.x > canvas.width - 40) car.x = canvas.width - 40;
 
   updateObstacles();
-  drawObstacles();
-  drawCar();
 
-  score += 0.05;
-
-  drawScore();
-  drawHighscore();
-  drawMadeBy();
-
+  // Collision detection
   for (const obstacle of obstacles) {
     if (isColliding(car, obstacle)) {
       gameOver = true;
@@ -231,7 +219,62 @@ function gameLoop() {
     }
   }
 
+  if (!gameOver) {
+    score += 0.05;
+    if (score > highscore) {
+      highscore = score;
+      localStorage.setItem('highscore', highscore);
+    }
+  }
+}
+
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'white';
+  ctx.font = '40px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 20);
+
+  ctx.font = '24px Arial';
+  ctx.fillText(`Final Score: ${Math.floor(score)}`, canvas.width / 2, canvas.height / 2 + 20);
+  ctx.fillText('Press R to Restart', canvas.width / 2, canvas.height / 2 + 60);
+}
+
+function gameLoop() {
+  drawRoad();
+  drawCar();
+  drawObstacles();
+  drawScore();
+  drawHighscore();
+  drawMadeBy();
+
+  if (gameOver) {
+    drawGameOver();
+  } else {
+    update();
+  }
+
   requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener('keydown', e => {
+  if (gameOver && (e.key === 'r' || e.key === 'R')) {
+    resetGame();
+  }
+});
+
+function resetGame() {
+  obstacles.length = 0;
+  score = 0;
+  obstacleSpeed = 3;
+  obstacleSpawnInterval = 2000;
+  gameOver = false;
+  clearInterval(obstacleSpawner);
+  startObstacleSpawner();
+  roadStripeOffset = 0;
+  car.x = canvas.width / 2 - 20;
 }
 
 gameLoop();
